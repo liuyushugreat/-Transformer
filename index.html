@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attention Is All You Need · 论文精读 + 代码实现</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+<style>
+  :root {
+    --bg: #f7f8fb; --card: #ffffff; --text: #1a1d29; --text-soft: #5b6270;
+    --border: #e6e8ef; --accent: #0ea5e9; --accent-2: #6366f1; --accent-soft: #e8f5fc;
+    --green: #16a34a; --green-soft: #e9f9ef; --amber: #d97706; --amber-soft: #fef4e5;
+    --red: #dc2626; --red-soft: #fdecec; --blue: #2563eb; --blue-soft: #e8f0fe;
+    --sidebar-bg: #0f172a; --sidebar-text: #94a3b8;
+    --shadow: 0 1px 2px rgba(16,18,32,.05), 0 8px 24px -12px rgba(16,18,32,.12);
+  }
+  [data-theme="dark"] {
+    --bg: #0f1117; --card: #171a23; --text: #e6e8f0; --text-soft: #9aa1b5;
+    --border: #262a38; --accent-soft: #122b36; --green-soft: #13301d; --amber-soft: #332610;
+    --red-soft: #331818; --blue-soft: #16253d; --sidebar-bg: #0b0d16; --sidebar-text: #8a90a8;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.75; transition: background .25s, color .25s;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .sidebar {
+    position: fixed; left:0; top:0; bottom:0; width:272px; background:var(--sidebar-bg);
+    color:var(--sidebar-text); overflow-y:auto; padding:20px 16px; z-index:50; transition: transform .25s;
+  }
+  .sidebar::-webkit-scrollbar { width:6px; } .sidebar::-webkit-scrollbar-thumb { background:#2b3650; border-radius:3px; }
+  .side-brand { display:flex; align-items:center; gap:10px; padding:6px 8px 18px; }
+  .side-brand .logo { width:36px; height:36px; border-radius:10px; flex:none;
+    background:linear-gradient(135deg,#0ea5e9,#6366f1); display:flex; align-items:center; justify-content:center;
+    font-weight:800; color:#fff; font-size:15px; }
+  .side-brand .t { font-size:13px; font-weight:700; color:#fff; line-height:1.25; }
+  .side-brand .s { font-size:11px; color:#7c88a6; }
+  .progress-wrap { padding:0 6px 14px; }
+  .progress-label { display:flex; justify-content:space-between; font-size:11px; color:#7c88a6; margin-bottom:6px; }
+  .progress-bar { height:6px; border-radius:3px; background:#24304b; overflow:hidden; }
+  .progress-fill { height:100%; width:0; border-radius:3px; background:linear-gradient(90deg,#0ea5e9,#6366f1); transition:width .3s; }
+  .side-nav a { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:9px;
+    color:var(--sidebar-text); font-size:13px; margin-bottom:2px; transition:.15s; }
+  .side-nav a:hover { background:#1b2540; color:#fff; text-decoration:none; }
+  .side-nav a.active { background:linear-gradient(90deg,#1c2a4a,#182238); color:#fff; }
+  .side-nav .num { width:22px; height:22px; border-radius:6px; flex:none; display:flex; align-items:center;
+    justify-content:center; font-size:11px; font-weight:700; background:#24304b; color:#9fb0d4; }
+  .side-nav a.active .num { background:linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; }
+  .side-sec-title { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#5d6a8c; padding:16px 10px 6px; }
+
+  .burger { display:none; position:fixed; top:14px; left:14px; z-index:60; background:var(--card);
+    border:1px solid var(--border); border-radius:10px; padding:8px 10px; cursor:pointer; box-shadow:var(--shadow); }
+  .main { margin-left:272px; padding:0 40px 80px; }
+  .theme-toggle { position:fixed; top:16px; right:20px; z-index:60; background:var(--card); border:1px solid var(--border);
+    color:var(--text); border-radius:999px; padding:8px 14px; cursor:pointer; font-size:13px; box-shadow:var(--shadow); transition:.15s; }
+  .theme-toggle:hover { transform:translateY(-1px); }
+
+  .hero { position:relative; overflow:hidden; background:linear-gradient(135deg,#0c4a6e 0%,#075985 40%,#4c1d95 100%);
+    color:#fff; border-radius:0 0 28px 28px; padding:56px 40px 48px; margin:0 -40px 36px; }
+  .hero::after { content:""; position:absolute; right:-80px; top:-80px; width:340px; height:340px;
+    background:radial-gradient(circle, rgba(14,165,233,.5), transparent 70%); }
+  .hero::before { content:""; position:absolute; left:30%; bottom:-140px; width:400px; height:400px;
+    background:radial-gradient(circle, rgba(99,102,241,.4), transparent 70%); }
+  .hero-inner { position:relative; z-index:2; max-width:920px; }
+  .hero .tag { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+    background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.22); padding:5px 12px; border-radius:999px; margin-bottom:18px; }
+  .hero h1 { font-size:34px; line-height:1.25; font-weight:800; letter-spacing:-.01em; margin-bottom:10px; }
+  .hero h1 .grad { background:linear-gradient(90deg,#7dd3fc,#c4b5fd); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero p.sub { font-size:15px; color:#c9dcec; max-width:700px; margin-bottom:8px; }
+  .hero .meta { font-size:12.5px; color:#9db8d4; }
+  .hero .cta-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:24px; }
+  .cta { display:inline-flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600; padding:10px 18px;
+    border-radius:11px; text-decoration:none !important; transition:.15s; }
+  .cta.primary { background:#fff; color:#075985; box-shadow:0 8px 20px -8px rgba(0,0,0,.4); }
+  .cta.primary:hover { transform:translateY(-2px); }
+  .cta.ghost { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.25); }
+  .cta.ghost:hover { background:rgba(255,255,255,.2); }
+
+  .roadmap { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:34px 0; }
+  .stage { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px;
+    position:relative; overflow:hidden; box-shadow:var(--shadow); }
+  .stage .st-num { position:absolute; right:14px; top:8px; font-size:60px; font-weight:800; color:var(--accent-soft); line-height:1; opacity:.9; }
+  .stage .st-badge { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
+  .stage h3 { font-size:16.5px; margin-bottom:6px; }
+  .stage p { font-size:13px; color:var(--text-soft); }
+  .stage .st-ch { font-size:12px; margin-top:10px; color:var(--text-soft); }
+  .stage .st-ch b { color:var(--accent); }
+  .stage.s1 { border-top:3px solid #0ea5e9; } .stage.s1 .st-badge { color:#0ea5e9; }
+  .stage.s2 { border-top:3px solid #6366f1; } .stage.s2 .st-badge { color:#6366f1; }
+  .stage.s3 { border-top:3px solid #16a34a; } .stage.s3 .st-badge { color:#16a34a; }
+
+  .section-title { margin:48px 0 20px; }
+  .section-title h2 { font-size:22px; font-weight:800; display:flex; align-items:center; gap:10px; }
+  .section-title h2 .bar { width:5px; height:22px; border-radius:3px; background:linear-gradient(180deg,#0ea5e9,#6366f1); }
+  .section-title p { font-size:13.5px; color:var(--text-soft); margin-top:4px; }
+
+  .chapter { background:var(--card); border:1px solid var(--border); border-radius:18px; margin-bottom:22px;
+    overflow:hidden; box-shadow:var(--shadow); scroll-margin-top:24px; }
+  .chapter-head { display:flex; align-items:flex-start; gap:16px; padding:22px 24px 18px; cursor:pointer; user-select:none; }
+  .ch-num { width:48px; height:48px; flex:none; border-radius:13px; font-weight:800; font-size:17px;
+    display:flex; align-items:center; justify-content:center; color:#fff; background:linear-gradient(135deg,#0ea5e9,#6366f1); }
+  .ch-head-main { flex:1; min-width:0; }
+  .ch-head-main h3 { font-size:18.5px; font-weight:800; line-height:1.3; }
+  .ch-head-main .en { font-size:12.5px; color:var(--text-soft); margin-top:2px; }
+  .ch-head-main .goal { font-size:13px; color:var(--text-soft); margin-top:8px; }
+  .ch-head-main .goal b { color:var(--accent); }
+  .ch-toggle { color:var(--text-soft); font-size:20px; flex:none; margin-top:10px; transition:transform .2s; }
+  .chapter.collapsed .ch-toggle { transform:rotate(-90deg); }
+  .chapter.collapsed .chapter-body { display:none; }
+  .chapter-body { padding:0 24px 22px; border-top:1px dashed var(--border); }
+  .ch-block { margin-top:18px; }
+  .ch-block > .label { font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--accent); display:flex; align-items:center; gap:6px; margin-bottom:10px; }
+  .kp { display:grid; gap:7px; }
+  .kp-item { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--border);
+    border-radius:11px; background:var(--bg); transition:.15s; }
+  .kp-item:hover { border-color:var(--accent); background:var(--accent-soft); }
+  .kp-item input[type=checkbox] { appearance:none; -webkit-appearance:none; width:18px; height:18px; flex:none; margin-top:2px;
+    border:2px solid #c3c8d8; border-radius:6px; cursor:pointer; position:relative; transition:.15s; }
+  .kp-item input[type=checkbox]:checked { background:var(--green); border-color:var(--green); }
+  .kp-item input[type=checkbox]:checked::after { content:"✓"; position:absolute; left:2px; top:-2px; color:#fff; font-size:12px; font-weight:800; }
+  .kp-item .txt { font-size:13.5px; }
+  .kp-item .txt b { color:var(--text); }
+  .kp-item .txt .hint { color:var(--text-soft); font-size:12.5px; }
+  .kp-item.done .txt { text-decoration:line-through; opacity:.55; }
+  .kp-item .txt code { background:var(--accent-soft); color:var(--accent-2); padding:1px 6px; border-radius:5px; font-size:12.5px; font-family:"SF Mono",Menlo,Consolas,monospace; }
+
+  .codes { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:9px; }
+  .code-link { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border);
+    border-radius:11px; background:var(--bg); color:var(--text); transition:.15s; font-size:13px; }
+  .code-link:hover { border-color:var(--accent); background:var(--accent-soft); text-decoration:none; transform:translateY(-1px); }
+  .code-link .ext { flex:none; width:34px; height:26px; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:800; border-radius:6px; letter-spacing:.02em; }
+  .ext.py { background:#3572A5; color:#fff; } .ext.md { background:#16a34a; color:#fff; }
+  .ext.html { background:#e34c26; color:#fff; }
+  .code-link .fn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:12px; }
+  .code-link .d { font-size:11px; color:var(--text-soft); flex:none; }
+
+  .formula { background:var(--bg); border:1px solid var(--border); border-left:4px solid var(--accent);
+    border-radius:11px; padding:14px 16px; overflow-x:auto; }
+  .formula .f-name { font-size:12px; font-weight:700; color:var(--text-soft); margin-bottom:6px; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; }
+  .config { display:flex; flex-wrap:wrap; gap:8px; }
+  .cfg { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:9px 12px; min-width:100px; text-align:center; }
+  .cfg .v { font-size:14px; font-weight:800; color:var(--accent); font-family:"SF Mono",Menlo,Consolas,monospace; }
+  .cfg .k { font-size:11px; color:var(--text-soft); margin-top:2px; }
+
+  .note { display:flex; gap:10px; padding:12px 14px; border-radius:11px; font-size:13px; margin-top:12px; }
+  .note.tip { background:var(--blue-soft); color:var(--blue); }
+  .note.warn { background:var(--amber-soft); color:var(--amber); }
+  .note.good { background:var(--green-soft); color:var(--green); }
+  .note .ni { font-weight:800; flex:none; }
+
+  table.cmp { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
+  table.cmp th, table.cmp td { border:1px solid var(--border); padding:9px 12px; text-align:center; }
+  table.cmp th { background:var(--accent-soft); color:var(--accent-2); font-weight:700; }
+  table.cmp td:first-child { text-align:left; font-weight:600; }
+  table.cmp .best { color:var(--green); font-weight:800; }
+
+  footer { margin-top:50px; padding:26px 0 10px; border-top:1px solid var(--border); color:var(--text-soft);
+    font-size:12.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+
+  @media (max-width:900px) {
+    .sidebar { transform:translateX(-100%); } .sidebar.open { transform:translateX(0); box-shadow:0 0 60px rgba(0,0,0,.5); }
+    .main { margin-left:0; padding:0 18px 70px; }
+    .hero { margin:0 -18px 28px; border-radius:0 0 22px 22px; padding:42px 20px 36px; }
+    .hero h1 { font-size:26px; } .roadmap { grid-template-columns:1fr; } .burger { display:block; }
+  }
+</style>
+</head>
+<body data-theme="light">
+<button class="burger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+<button class="theme-toggle" onclick="toggleTheme()">🌙 深色模式</button>
+
+<aside class="sidebar">
+  <div class="side-brand">
+    <div class="logo">T</div>
+    <div>
+      <div class="t">Attention Is All You Need</div>
+      <div class="s">论文精读 + 代码实现</div>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span>学习进度</span><span id="progressPct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+  <nav class="side-nav" id="sideNav">
+    <a href="#roadmap">🧭 学习路线</a>
+    <a href="#formulas">📐 核心公式</a>
+    <div class="side-sec-title">论文解读</div>
+    <a href="#s1"><span class="num">1</span> 引言与背景</a>
+    <a href="#s2"><span class="num">2</span> 模型架构总览</a>
+    <a href="#s3"><span class="num">3</span> 编码器 & 解码器</a>
+    <a href="#s4"><span class="num">4</span> 缩放点积注意力</a>
+    <a href="#s5"><span class="num">5</span> 多头注意力</a>
+    <a href="#s6"><span class="num">6</span> 三种注意力应用</a>
+    <a href="#s7"><span class="num">7</span> 前馈网络</a>
+    <a href="#s8"><span class="num">8</span> 嵌入与 Softmax</a>
+    <a href="#s9"><span class="num">9</span> 位置编码</a>
+    <a href="#s10"><span class="num">10</span> 为什么自注意力</a>
+    <a href="#s11"><span class="num">11</span> 训练细节</a>
+    <a href="#s12"><span class="num">12</span> 结果与结论</a>
+    <div class="side-sec-title">动手实践</div>
+    <a href="#s13"><span class="num">13</span> 代码实战</a>
+    <a href="#codemap"><span class="num">🗺</span> 代码地图</a>
+  </nav>
+</aside>
+
+<div class="main">
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="tag">📄 Attention Is All You Need · Vaswani et al., 2017 · NeurIPS</div>
+    <h1>Transformer 论文精读<br><span class="grad">一张图 + 一份代码，彻底吃透</span></h1>
+    <p class="sub">本页将《Attention Is All You Need》的核心思想逐条拆解，并与仓库中的从零实现 <code>transformer_zh2en.py</code>（中译英玩具模型）逐行对应。读懂论文结构，看懂每一行代码，你就能独立复现一个 Transformer。</p>
+    <div class="meta">论文 8 页 · 模型：6 层编码器 + 6 层解码器 · 机器翻译 SOTA（EN-DE 28.4 BLEU） · 配套代码 CPU 1 分钟可跑通</div>
+    <div class="cta-row">
+      <a class="cta primary" href="#s2">🚀 开始精读</a>
+      <a class="cta ghost" href="#s13">💻 直接看代码实战</a>
+      <a class="cta ghost" href="https://github.com/liuyushugreat/-Transformer">📁 打开代码仓库</a>
+    </div>
+  </div>
+</header>
+
+<section id="roadmap">
+  <div class="section-title">
+    <h2><span class="bar"></span>学习路线：三步吃透 Transformer</h2>
+    <p>从论文原理，到代码实现，再到亲手运行，一条龙掌握。</p>
+  </div>
+  <div class="roadmap">
+    <div class="stage s1"><div class="st-num">1</div>
+      <div class="st-badge">Step 1 · 读论文</div>
+      <h3>理解核心思想</h3>
+      <p>为什么抛弃 RNN？自注意力如何做到 O(1) 路径长度？多头注意力的意义？</p>
+      <div class="st-ch"><b>对应下方「论文解读」1–12 节</b></div>
+    </div>
+    <div class="stage s2"><div class="st-num">2</div>
+      <div class="st-badge">Step 2 · 读代码</div>
+      <h3>逐行对照实现</h3>
+      <p>每个论文组件对应 <code>transformer_zh2en.py</code> 的一个类/函数，边读边点链接。</p>
+      <div class="st-ch"><b>对应下方「代码实战」+「代码地图」</b></div>
+    </div>
+    <div class="stage s3"><div class="st-num">3</div>
+      <div class="st-badge">Step 3 · 跑起来</div>
+      <h3>亲手复现</h3>
+      <p>克隆仓库，一条命令训练，观察「我要吃苹果 → i want to eat an apple」逐词生成。</p>
+      <div class="st-ch"><b>CPU 约 1 分钟，无需 GPU</b></div>
+    </div>
+  </div>
+</section>
+
+<div class="section-title">
+  <h2><span class="bar"></span>论文解读 · 逐节精读</h2>
+  <p>每节含「论文要点 · 对应代码」。勾选知识点记录进度（自动保存）。</p>
+</div>
+
+<!-- ============ S1 ============ -->
+<section class="chapter" id="s1">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">1</div>
+    <div class="ch-head-main">
+      <h3>引言与背景</h3>
+      <div class="en">Introduction & Background</div>
+      <div class="goal">🎯 <b>论文问题：</b>RNN 逐位置串行计算，无法并行、长序列梯度难传播。Transformer 用「纯注意力」替换循环，完全并行化。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="RNN 串行瓶颈"><span class="txt"><b>RNN 的瓶颈</b>：按符号位置串行计算，隐藏状态 $h_t$ 依赖 $h_{t-1}$，训练无法并行，长序列受限</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="注意力机制"><span class="txt"><b>注意力机制</b>：无需考虑距离即可建模依赖关系，但此前通常与 RNN 结合使用</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="Transformer 主张"><span class="txt"><b>Transformer 主张</b>：完全抛弃循环与卷积，只用注意力，显著提升并行度</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="自注意力定义"><span class="txt"><b>自注意力（Self-Attention）</b>：关联同一序列内不同位置，计算序列的表征</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="路径长度"><span class="txt"><b>常数路径长度</b>：任意两个位置的依赖只需 $O(1)$ 步（RNN 需 $O(n)$，CNN 需 $O(\log_k n)$）</span></label>
+      </div>
+    </div>
+    <div class="note tip"><span class="ni">💡</span><span>一句话理解：论文把「序列建模」从「按时间顺序一步步算」变成「所有位置同时互相看」，这是 Transformer 一切优点的根源。</span></div>
+  </div>
+</section>
+
+<!-- ============ S2 ============ -->
+<section class="chapter" id="s2">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">2</div>
+    <div class="ch-head-main">
+      <h3>模型架构总览</h3>
+      <div class="en">Model Architecture</div>
+      <div class="goal">🎯 <b>论文要点：</b>编码器-解码器结构。编码器把输入 $(x_1..x_n)$ 映射为连续表征 $z$，解码器再逐元素自回归地生成输出 $(y_1..y_m)$。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="编码器解码器"><span class="txt"><b>编码器-解码器</b>：编码器读入整个源序列，解码器自回归地逐词生成目标序列</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="自回归"><span class="txt"><b>自回归（Auto-regressive）</b>：生成下一个词时，把之前已生成的词作为额外输入</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="堆叠层"><span class="txt"><b>堆叠结构</b>：编码器和解码器都由堆叠的自注意力 + 逐位置全连接层组成</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L214-L250"><span class="ext py">py</span><span class="fn">class Transformer</span><span class="d">L214–250 · 整体组装 ⭐</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L243-L255"><span class="ext py">py</span><span class="fn">encode / decode / forward</span><span class="d">L243–255</span></a>
+      </div>
+    </div>
+    <div class="note tip"><span class="ni">💡</span><span>玩具代码把论文的 <b>N=6 层、d_model=512</b> 缩小为 <b>n_layers=2、d_model=128</b>，结构完全一致，CPU 上 1 分钟即可训练。</span></div>
+  </div>
+</section>
+
+<!-- ============ S3 ============ -->
+<section class="chapter" id="s3">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">3</div>
+    <div class="ch-head-main">
+      <h3>编码器 & 解码器堆栈</h3>
+      <div class="en">Encoder and Decoder Stacks (3.1)</div>
+      <div class="goal">🎯 <b>论文要点：</b>N=6 个相同层。每层含多头自注意力 + 前馈网络两个子层，均带残差连接与 LayerNorm。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="编码器层"><span class="txt"><b>编码器层</b>：① 多头自注意力 ② 位置前馈网络，每个子层都套残差 + LayerNorm</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="残差归一化"><span class="txt"><b>残差 + LayerNorm</b>：每个子层输出为 $\mathrm{LayerNorm}(x+\mathrm{Sublayer}(x))$</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="d_model"><span class="txt"><b>统一维度</b>：所有子层和嵌入层输出维度均为 $d_{model}=512$，保证残差可相加</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="解码器层"><span class="txt"><b>解码器层</b>：比编码器多一个<b>交叉注意力子层</b>（对编码器输出做多头注意力）</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="解码器掩码"><span class="txt"><b>解码器自注意力掩码</b>：防止位置关注到后续位置，保证自回归</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L182-L196"><span class="ext py">py</span><span class="fn">class EncoderLayer</span><span class="d">L182–196 · 编码器层</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L197-L213"><span class="ext py">py</span><span class="fn">class DecoderLayer</span><span class="d">L197–213 · 解码器层</span></a>
+      </div>
+    </div>
+    <div class="note tip"><span class="ni">💡</span><span>代码注释里写了 <b>Post-LN（与原论文一致）</b>：先做子层计算再 LayerNorm。现代 Llama 等模型改成了 Pre-LN，但论文原始版本是 Post-LN。</span></div>
+  </div>
+</section>
+
+<!-- ============ S4 ============ -->
+<section class="chapter" id="s4">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">4</div>
+    <div class="ch-head-main">
+      <h3>缩放点积注意力</h3>
+      <div class="en">Scaled Dot-Product Attention (3.2.1)</div>
+      <div class="goal">🎯 <b>论文要点：</b>注意力 = 对 Value 的加权求和，权重由 Query 与 Key 的相似度决定。除以 $\sqrt{d_k}$ 防止点积过大。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="QKV 概念"><span class="txt"><b>Q / K / V</b>：Query 查询、Key 键、Value 值；输出是 Value 的加权和，权重 = Q 与 K 的相容度</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="缩放原因"><span class="txt"><b>为什么除以 $\sqrt{d_k}$</b>：$d_k$ 大时点积值变大，softmax 进入梯度极小区域，缩放可抵消</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="点积 vs 加性"><span class="txt"><b>点积 vs 加性注意力</b>：理论复杂度相近，但点积可用矩阵乘法实现，更快更省空间</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">📐</span> 核心公式（论文式 1）</div>
+      <div class="formula"><div class="f-name">缩放点积注意力</div>
+        $$\text{Attention}(Q,K,V)=\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right)V$$
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L130-L140"><span class="ext py">py</span><span class="fn">scaled_dot_product_attention</span><span class="d">L130–140 ⭐</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ S5 ============ -->
+<section class="chapter" id="s5">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">5</div>
+    <div class="ch-head-main">
+      <h3>多头注意力</h3>
+      <div class="en">Multi-Head Attention (3.2.2)</div>
+      <div class="goal">🎯 <b>论文要点：</b>把 Q/K/V 线性投影 h 次，并行做注意力，拼接后再投影。让模型从不同表征子空间联合关注信息。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="多头动机"><span class="txt"><b>为什么多头</b>：单头平均会抑制多样性；多头让模型在不同表征子空间、不同位置联合关注</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="头数与维度"><span class="txt"><b>超参数</b>：$h=8$ 个头，每个头 $d_k=d_v=d_{model}/h=64$</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="计算量"><span class="txt"><b>计算量不变</b>：因每头维度降低，总计算量与全维单头注意力相当</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">📐</span> 核心公式（论文式 2）</div>
+      <div class="formula"><div class="f-name">多头注意力</div>
+        $$\text{MultiHead}(Q,K,V)=\text{Concat}(\text{head}_1,\dots,\text{head}_h)W^O,\quad \text{head}_i=\text{Attention}(QW_i^Q,KW_i^K,VW_i^V)$$
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L142-L166"><span class="ext py">py</span><span class="fn">class MultiHeadAttention</span><span class="d">L142–166 ⭐</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L154-L157"><span class="ext py">py</span><span class="fn">_split 分头</span><span class="d">L154–157</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ S6 ============ -->
+<section class="chapter" id="s6">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">6</div>
+    <div class="ch-head-main">
+      <h3>注意力的三种应用</h3>
+      <div class="en">Applications of Attention (3.2.3)</div>
+      <div class="goal">🎯 <b>论文要点：</b>Transformer 在三个地方用多头注意力——编码器自注意力、解码器因果自注意力、编码器-解码器交叉注意力。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 三种注意力</div>
+      <table class="cmp">
+        <tr><th>位置</th><th>Query 来自</th><th>Key / Value 来自</th><th>是否掩码</th></tr>
+        <tr><td>编码器自注意力</td><td>前一层编码器输出</td><td>同层（同一来源）</td><td>无（可看全部）</td></tr>
+        <tr><td>解码器自注意力</td><td>前一层解码器输出</td><td>同层（同一来源）</td><td>✅ 因果掩码（只能看已生成）</td></tr>
+        <tr><td>编码器-解码器交叉注意力</td><td>前一解码器层</td><td>编码器输出（memory）</td><td>无（可看全部源序列）</td></tr>
+      </table>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L232-L234"><span class="ext py">py</span><span class="fn">make_src_mask</span><span class="d">L232–234 · 源掩码</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L236-L241"><span class="ext py">py</span><span class="fn">make_tgt_mask</span><span class="d">L236–241 · 因果掩码 ⭐</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L207-L212"><span class="ext py">py</span><span class="fn">DecoderLayer.forward</span><span class="d">L207–212 · 交叉注意力</span></a>
+      </div>
+    </div>
+    <div class="note tip"><span class="ni">💡</span><span>因果掩码用 <code>torch.tril</code> 生成下三角矩阵，把「未来」位置在 softmax 前设为 $-\infty$，保证位置 $i$ 只依赖 $<i$ 的输出。</span></div>
+  </div>
+</section>
+
+<!-- ============ S7 ============ -->
+<section class="chapter" id="s7">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">7</div>
+    <div class="ch-head-main">
+      <h3>位置前馈网络</h3>
+      <div class="en">Position-wise Feed-Forward Networks (3.3)</div>
+      <div class="goal">🎯 <b>论文要点：</b>每层还有一个逐位置应用的全连接前馈网络，两次线性变换 + ReLU。内层维度 $d_{ff}=2048$。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="FFN 结构"><span class="txt"><b>结构</b>：两次线性变换，中间 ReLU 激活，逐位置独立且相同地应用</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="FFN 维度"><span class="txt"><b>维度</b>：输入输出 $d_{model}=512$，内层 $d_{ff}=2048$（4 倍扩张）</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="FFN 等价"><span class="txt"><b>等价说法</b>：可看作卷积核大小为 1 的两层卷积</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">📐</span> 核心公式（论文式 2）</div>
+      <div class="formula"><div class="f-name">位置前馈网络</div>
+        $$\text{FFN}(x)=\max(0,\;xW_1+b_1)\,W_2+b_2$$
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L168-L179"><span class="ext py">py</span><span class="fn">class FeedForward</span><span class="d">L168–179 ⭐</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ S8 ============ -->
+<section class="chapter" id="s8">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">8</div>
+    <div class="ch-head-main">
+      <h3>嵌入与 Softmax</h3>
+      <div class="en">Embeddings and Softmax (3.4)</div>
+      <div class="goal">🎯 <b>论文要点：</b>学到的嵌入把 token 转为 $d_{model}$ 维向量；嵌入层权重乘 $\sqrt{d_{model}}$；三层共享同一权重矩阵。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="嵌入"><span class="txt"><b>学到的嵌入</b>：把输入/输出 token 转为 $d_{model}$ 维向量</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="权重共享"><span class="txt"><b>权重共享</b>：两个嵌入层与 pre-softmax 线性变换共享同一权重矩阵</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="乘以 sqrt"><span class="txt"><b>乘 $\sqrt{d_{model}}$</b>：嵌入层权重乘以 $\sqrt{d_{model}}$，缩放嵌入</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L100-L110"><span class="ext py">py</span><span class="fn">class TokenEmbedding</span><span class="d">L100–110 · ×√d_model ⭐</span></a>
+      </div>
+    </div>
+    <div class="note warn"><span class="ni">⚠️</span><span>玩具代码为简洁起见<b>未做权重共享</b>（源/目标嵌入分开，generator 独立线性层），这是与论文唯一的结构差异，不影响学习原理。</span></div>
+  </div>
+</section>
+
+<!-- ============ S9 ============ -->
+<section class="chapter" id="s9">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">9</div>
+    <div class="ch-head-main">
+      <h3>位置编码</h3>
+      <div class="en">Positional Encoding (3.5)</div>
+      <div class="goal">🎯 <b>论文要点：</b>模型没有循环/卷积，需注入位置信息。用不同频率的正弦/余弦函数作为位置编码，加到嵌入上。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="位置信息"><span class="txt"><b>为什么需要</b>：无循环无卷积，必须显式注入 token 的相对/绝对位置</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="正弦编码"><span class="txt"><b>正弦/余弦编码</b>：偶数维用 sin、奇数维用 cos，波长从 $2\pi$ 到 $10000\cdot2\pi$ 成几何级数</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="相对位置性质"><span class="txt"><b>关键性质</b>：任意固定偏移 $k$，$PE_{pos+k}$ 可表示为 $PE_{pos}$ 的线性函数 → 模型易学相对位置</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="外推"><span class="txt"><b>选择正弦的原因</b>：可能外推到训练中未见过的更长序列；实验中学到的位置嵌入效果几乎相同</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">📐</span> 核心公式（论文式 3）</div>
+      <div class="formula"><div class="f-name">正弦位置编码</div>
+        $$PE_{(pos,\,2i)}=\sin\!\Big(pos/10000^{2i/d_{model}}\Big),\qquad PE_{(pos,\,2i+1)}=\cos\!\Big(pos/10000^{2i/d_{model}}\Big)$$
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L112-L128"><span class="ext py">py</span><span class="fn">class PositionalEncoding</span><span class="d">L112–128 ⭐</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ S10 ============ -->
+<section class="chapter" id="s10">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">10</div>
+    <div class="ch-head-main">
+      <h3>为什么用自注意力</h3>
+      <div class="en">Why Self-Attention (4)</div>
+      <div class="goal">🎯 <b>论文要点：</b>从计算复杂度、可并行度、长依赖路径长度三个维度，对比自注意力 vs 循环 vs 卷积。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">📊</span> 三类层对比（论文 Table 1）</div>
+      <table class="cmp">
+        <tr><th>层类型</th><th>每层复杂度</th><th>串行操作数</th><th>最大路径长度</th></tr>
+        <tr><td>自注意力</td><td>$O(n^2\cdot d)$</td><td class="best">$O(1)$</td><td class="best">$O(1)$</td></tr>
+        <tr><td>循环</td><td>$O(n\cdot d^2)$</td><td>$O(n)$</td><td>$O(n)$</td></tr>
+        <tr><td>卷积</td><td>$O(k\cdot n\cdot d^2)$</td><td>$O(1)$</td><td>$O(\log_k n)$</td></tr>
+      </table>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="三标准"><span class="txt"><b>三个评价标准</b>：① 每层计算复杂度 ② 可并行化的程度（最少串行操作数）③ 长依赖的路径长度</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="自注意力优势"><span class="txt"><b>自注意力优势</b>：串行操作 $O(1)$、路径长度 $O(1)$；当 $n < d$ 时计算也快于循环</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="可解释性"><span class="txt"><b>附加收益</b>：注意力分布可解释，不同头学到不同句法/语义结构</span></label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ S11 ============ -->
+<section class="chapter" id="s11">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">11</div>
+    <div class="ch-head-main">
+      <h3>训练细节</h3>
+      <div class="en">Training (5)</div>
+      <div class="goal">🎯 <b>论文要点：</b>Adam 优化器 + 学习率 warmup 调度；两个正则化：残差 Dropout 与标签平滑。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 论文要点</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="数据"><span class="txt"><b>训练数据</b>：WMT 2014 EN-DE 约 450 万句对（BPE 词表 37k）；EN-FR 3600 万句对（word-piece 32k）</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="硬件"><span class="txt"><b>硬件与时长</b>：8 块 NVIDIA P100；base 训练 10 万步（12 小时），big 30 万步（3.5 天）</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="Adam"><span class="txt"><b>优化器</b>：Adam，$\beta_1=0.9,\ \beta_2=0.98,\ \epsilon=10^{-9}$</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="学习率 warmup"><span class="txt"><b>学习率调度</b>：前 4000 步线性升温，之后按步数反平方根衰减（warmup_steps=4000）</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="Dropout"><span class="txt"><b>残差 Dropout</b>：每个子层输出、嵌入与位置编码之和处加 dropout，$P_{drop}=0.1$</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="标签平滑"><span class="txt"><b>标签平滑</b>：$\epsilon_{ls}=0.1$，牺牲困惑度、提升准确率与 BLEU</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">📐</span> 核心公式（论文式 3）</div>
+      <div class="formula"><div class="f-name">学习率 warmup 调度</div>
+        $$lrate = d_{model}^{-0.5}\cdot\min\!\Big(step\_num^{-0.5},\ step\_num\cdot warmup\_steps^{-1.5}\Big)$$
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应代码</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L266-L282"><span class="ext py">py</span><span class="fn">train 函数</span><span class="d">L266–282 · Adam + 标签平滑 ⭐</span></a>
+      </div>
+    </div>
+    <div class="note tip"><span class="ni">💡</span><span>代码严格复刻了论文的 Adam 参数 <code>betas=(0.9, 0.98), eps=1e-9</code> 和标签平滑 <code>label_smoothing=0.1</code>，并额外加了梯度裁剪 <code>clip_grad_norm(1.0)</code>。</span></div>
+  </div>
+</section>
+
+<!-- ============ S12 ============ -->
+<section class="chapter" id="s12">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">12</div>
+    <div class="ch-head-main">
+      <h3>结果与结论</h3>
+      <div class="en">Results & Conclusion (6–7)</div>
+      <div class="goal">🎯 <b>论文结论：</b>机器翻译全面刷新 SOTA（EN-DE 28.4 BLEU），训练成本大幅下降，并能泛化到句法分析等任务。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🏆</span> 核心结果</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="翻译结果"><span class="txt"><b>机器翻译 SOTA</b>：EN-DE 大模型 <b>28.4 BLEU</b>（超过此前最佳集成 2.0+）；EN-FR <b>41.8 BLEU</b></span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="训练成本"><span class="txt"><b>训练成本</b>：base 模型 3.3×10¹⁸ FLOPs，仅为此前最优模型的一小部分</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="模型变体"><span class="txt"><b>消融（Table 3）</b>：头数过少/过多都会掉点；$d_k$ 减小掉点；更大模型更好；dropout 很关键</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="泛化"><span class="txt"><b>泛化能力</b>：不加任务特定调参，在英文成分句法分析上仍达 SOTA（WSJ 23 F1 92.7）</span></label>
+      </div>
+    </div>
+    <div class="note good"><span class="ni">🎯</span><span>论文意义：Transformer 成为后来 GPT、BERT、Llama 等一切大模型的共同底座——读透这篇论文，等于掌握了整个现代 NLP 的地基。</span></div>
+  </div>
+</section>
+
+<!-- ============ S13 ============ -->
+<section class="chapter" id="s13">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">13</div>
+    <div class="ch-head-main">
+      <h3>代码实战：中译英从零实现</h3>
+      <div class="en">Hands-on: from-scratch zh→en implementation</div>
+      <div class="goal">🎯 <b>代码要点：</b>用 22 条迷你中英语料训练一个玩具 Transformer，完整跑通「数据 → 模型 → 训练 → 推理」，并可视化交叉注意力。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">🧩</span> 代码四大部分</div>
+      <div class="kp">
+        <label class="kp-item"><input type="checkbox" data-kp="数据部分"><span class="txt"><b>第 1 部分 · 数据</b>：22 条中英平行语料、<code>Vocab</code> 词表、<code>make_batch</code> 填充批处理</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="模型部分"><span class="txt"><b>第 2 部分 · 模型</b>：嵌入、位置编码、注意力、多头、FFN、编码器、解码器、Transformer</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="训练部分"><span class="txt"><b>第 3 部分 · 训练</b>：Adam + 标签平滑 + 梯度裁剪 + Teacher Forcing（右移一位）</span></label>
+        <label class="kp-item"><input type="checkbox" data-kp="推理部分"><span class="txt"><b>第 4 部分 · 推理</b>：贪心解码逐词生成，打印每步概率；可视化最后一层交叉注意力</span></label>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">⚙️</span> 玩具模型 vs 论文配置</div>
+      <div class="config">
+        <div class="cfg"><div class="v">2 / 6</div><div class="k">n_layers 层数（玩具/论文）</div></div>
+        <div class="cfg"><div class="v">128 / 512</div><div class="k">d_model 维度</div></div>
+        <div class="cfg"><div class="v">4 / 8</div><div class="k">n_heads 头数</div></div>
+        <div class="cfg"><div class="v">256 / 2048</div><div class="k">d_ff 前馈内层</div></div>
+        <div class="cfg"><div class="v">22 句</div><div class="k">训练语料规模</div></div>
+        <div class="cfg"><div class="v">~1 分钟</div><div class="k">CPU 训练时长</div></div>
+      </div>
+    </div>
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 对应源码（完整文件）</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L22-L96"><span class="ext py">py</span><span class="fn">第 1 部分 · 数据</span><span class="d">L22–96</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L100-L262"><span class="ext py">py</span><span class="fn">第 2 部分 · 模型</span><span class="d">L100–262</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L266-L282"><span class="ext py">py</span><span class="fn">第 3 部分 · 训练</span><span class="d">L266–282</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L291-L312"><span class="ext py">py</span><span class="fn">第 4 部分 · 推理</span><span class="d">L291–312</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py"><span class="ext py">py</span><span class="fn">transformer_zh2en.py 全文</span><span class="d">完整代码</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/Transformer图解_我要吃苹果.md"><span class="ext md">md</span><span class="fn">Transformer图解 教程</span><span class="d">13 章中文图解</span></a>
+      </div>
+    </div>
+    <div class="note good"><span class="ni">🏁</span><span>运行方式：<code>pip install torch</code> 后 <code>python transformer_zh2en.py</code>，即可看到「我要吃苹果 → i want to eat an apple」逐词生成，并打印注意力对齐矩阵。</span></div>
+  </div>
+</section>
+
+<!-- ============ CODEMAP ============ -->
+<section class="chapter" id="codemap">
+  <div class="chapter-head" onclick="toggleCh(this)">
+    <div class="ch-num">🗺</div>
+    <div class="ch-head-main">
+      <h3>代码地图：每个组件一行定位</h3>
+      <div class="en">Code Map of transformer_zh2en.py</div>
+      <div class="goal">🎯 <b>目标：</b>按论文顺序，把所有类/函数与行号一一对应，点击直达 GitHub 源码。</div>
+    </div>
+    <div class="ch-toggle">▾</div>
+  </div>
+  <div class="chapter-body">
+    <div class="ch-block">
+      <div class="label"><span class="ic">💻</span> 组件 → 论文 → 代码行</div>
+      <div class="codes">
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L22-L40"><span class="ext py">py</span><span class="fn">PAIRS 语料</span><span class="d">L22 · §5.1</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L51-L76"><span class="ext py">py</span><span class="fn">class Vocab</span><span class="d">L51 · 词表</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L87-L96"><span class="ext py">py</span><span class="fn">make_batch</span><span class="d">L87 · 批处理</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L100-L110"><span class="ext py">py</span><span class="fn">TokenEmbedding</span><span class="d">L100 · §3.4</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L112-L128"><span class="ext py">py</span><span class="fn">PositionalEncoding</span><span class="d">L112 · §3.5</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L130-L140"><span class="ext py">py</span><span class="fn">scaled_dot_product_attention</span><span class="d">L130 · §3.2.1</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L142-L166"><span class="ext py">py</span><span class="fn">MultiHeadAttention</span><span class="d">L142 · §3.2.2</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L168-L179"><span class="ext py">py</span><span class="fn">FeedForward</span><span class="d">L168 · §3.3</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L182-L196"><span class="ext py">py</span><span class="fn">EncoderLayer</span><span class="d">L182 · §3.1</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L197-L213"><span class="ext py">py</span><span class="fn">DecoderLayer</span><span class="d">L197 · §3.1</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L214-L262"><span class="ext py">py</span><span class="fn">Transformer</span><span class="d">L214 · §3</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L232-L241"><span class="ext py">py</span><span class="fn">make_src/tgt_mask</span><span class="d">L232 · 掩码</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L266-L282"><span class="ext py">py</span><span class="fn">train</span><span class="d">L266 · §5</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L291-L309"><span class="ext py">py</span><span class="fn">translate</span><span class="d">L291 · 推理</span></a>
+        <a class="code-link" href="https://github.com/liuyushugreat/-Transformer/blob/main/transformer_zh2en.py#L310-L322"><span class="ext py">py</span><span class="fn">show_cross_attention</span><span class="d">L310 · 可视化</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FORMULAS ============ -->
+<section id="formulas">
+  <div class="section-title">
+    <h2><span class="bar"></span>核心公式速查</h2>
+    <p>论文全部 3 个公式 + 多头注意力公式，记住它们就掌握了 Transformer 的数学本质。</p>
+  </div>
+  <div class="chapter" style="padding-bottom:8px;">
+    <div class="chapter-body" style="border:none;padding-top:22px;">
+      <div class="grid2">
+        <div class="formula"><div class="f-name">① 缩放点积注意力（式 1）</div>
+          $$\text{Attention}(Q,K,V)=\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right)V$$
+        </div>
+        <div class="formula"><div class="f-name">② 多头注意力（式 2）</div>
+          $$\text{MultiHead}(Q,K,V)=\text{Concat}(\text{head}_1,\dots,\text{head}_h)W^O$$
+        </div>
+        <div class="formula"><div class="f-name">③ 位置前馈网络（式 2）</div>
+          $$\text{FFN}(x)=\max(0,\;xW_1+b_1)\,W_2+b_2$$
+        </div>
+        <div class="formula"><div class="f-name">④ 位置编码（式 3）</div>
+          $$PE_{(pos,\,2i)}=\sin\!\Big(pos/10000^{2i/d_{model}}\Big),\qquad PE_{(pos,\,2i+1)}=\cos\!\Big(pos/10000^{2i/d_{model}}\Big)$$
+        </div>
+        <div class="formula"><div class="f-name">⑤ 学习率调度（式 4）</div>
+          $$lrate = d_{model}^{-0.5}\cdot\min\!\Big(step\_num^{-0.5},\ step\_num\cdot warmup\_steps^{-1.5}\Big)$$
+        </div>
+        <div class="formula"><div class="f-name">⑥ 残差 + LayerNorm</div>
+          $$\text{Output}=\mathrm{LayerNorm}\big(x+\mathrm{Sublayer}(x)\big)$$
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>📄 内容整理自《Attention Is All You Need》(Vaswani et al., 2017) · NeurIPS 2017</div>
+  <div>🔗 源码：<a href="https://github.com/liuyushugreat/-Transformer">liuyushugreat/-Transformer</a> · 学习进度保存在本机浏览器</div>
+</footer>
+
+</div>
+
+<script>
+  const savedTheme = localStorage.getItem('transformer-theme') || 'light';
+  document.body.setAttribute('data-theme', savedTheme);
+  updateThemeBtn();
+  function toggleTheme() {
+    const cur = document.body.getAttribute('data-theme');
+    const next = cur === 'light' ? 'dark' : 'light';
+    document.body.setAttribute('data-theme', next);
+    localStorage.setItem('transformer-theme', next);
+    updateThemeBtn();
+  }
+  function updateThemeBtn() {
+    const dark = document.body.getAttribute('data-theme') === 'dark';
+    document.querySelector('.theme-toggle').textContent = dark ? '☀️ 浅色模式' : '🌙 深色模式';
+  }
+  function toggleCh(el) { el.closest('.chapter').classList.toggle('collapsed'); }
+
+  const STORE_KEY = 'transformer-kp-progress';
+  function loadProgress() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e) { return {}; } }
+  function saveProgress(p) { localStorage.setItem(STORE_KEY, JSON.stringify(p)); }
+  const progress = loadProgress();
+  document.querySelectorAll('.kp-item input[type=checkbox]').forEach(cb => {
+    const key = cb.dataset.kp;
+    if (progress[key]) { cb.checked = true; cb.closest('.kp-item').classList.add('done'); }
+    cb.addEventListener('change', () => {
+      if (cb.checked) progress[key] = 1; else delete progress[key];
+      saveProgress(progress);
+      cb.closest('.kp-item').classList.toggle('done', cb.checked);
+      updateProgress();
+    });
+  });
+  function updateProgress() {
+    const all = document.querySelectorAll('.kp-item input[type=checkbox]');
+    const done = document.querySelectorAll('.kp-item input[type=checkbox]:checked');
+    const pct = all.length ? Math.round(done.length / all.length * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+  }
+  updateProgress();
+
+  const navLinks = document.querySelectorAll('#sideNav a[href^="#"]');
+  const sections = [...navLinks].map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  function onScroll() {
+    let cur = sections[0] && sections[0].id;
+    const pos = window.scrollY + 120;
+    sections.forEach(sec => { if (sec.offsetTop <= pos) cur = sec.id; });
+    navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>
